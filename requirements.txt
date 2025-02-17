@@ -1,4 +1,7 @@
 pydantic
 requests
 aiohttp
-load-dotenv
+python-dotenv
+bumpversion
+pytest
+pytest-asyncio

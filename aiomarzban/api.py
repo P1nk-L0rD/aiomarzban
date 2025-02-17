@@ -4,6 +4,7 @@ import aiohttp
 import requests
 
 from .enums import UserDataLimitResetStrategy
+from .utils import remove_nones
 from .exceptions import MarzbanException
 from .methods import Methods
 from .models import Admin, AdminCreate, AdminModify, CoreStats, NodeCreate, NodeModify, NodeResponse, NodeSettings, \
@@ -20,16 +21,22 @@ class MarzbanAPI:
         password: str,
         sub_path: Optional[str] = "sub",
 
-        # Default params
+        # Default user params
         default_days: Optional[int] = None,
         default_expire: Optional[int] = None,
         default_data_limit: Optional[int] = None,
         default_data_limit_reset_strategy: Optional[UserDataLimitResetStrategy] = None,
         default_proxies: Optional[dict] = None,
-        default_inbounds: Optional[dict] = None,
+        default_inbounds: Optional[Dict[str, Any]] = None,
+        default_note: Optional[str] = None,
+        default_on_hold_expire_duration: Optional[int] = None,
+        default_on_hold_timeout: Optional[str] = None,
+        default_auto_delete_in_days: Optional[int] = None,
+        default_next_plan: Optional[NextPlanModel] = None,
+        default_status: Optional[UserStatusCreate] = None,
     ):
         self.address = address
-        self.api_address = address + "api"
+        self.api_url = address + "api"
         self.username = username
         self.password = password
         self.sub_path = sub_path
@@ -39,30 +46,34 @@ class MarzbanAPI:
             "Authorization": f"Bearer {self.token}"
         }
 
-        # Default params
+        # Default user params
         self.default_days = default_days
+        self.default_expire = default_expire
         self.default_data_limit = default_data_limit
         self.default_data_limit_reset_strategy = default_data_limit_reset_strategy
         self.default_proxies = default_proxies or dict()
         self.default_inbounds = default_inbounds or dict()
+        self.default_note = default_note
+        self.default_on_hold_expire_duration = default_on_hold_expire_duration
+        self.default_on_hold_timeout = default_on_hold_timeout
+        self.default_auto_delete_in_days = default_auto_delete_in_days
+        self.default_next_plan = default_next_plan
+        self.default_status = default_status
 
     def get_token(self) -> str:
-        """Создание токена доступа."""
+        """Bearer token creation."""
         data = {
             "username": self.username,
             "password": self.password,
         }
-        answer = requests.post(self.api_address + "/admin/token", data=data)
+        answer = requests.post(self.api_url + "/admin/token", data=data)
         if answer.status_code != 200:
-            print(answer.content)
-            print(self.api_address + "/admin/token")
             raise MarzbanException(f"Error: {answer.status_code}; Body: {answer.json()}")
 
-        data = answer.json()
-        return data["access_token"]
+        return answer.json()["access_token"]
 
     def refresh_token(self):
-        """Обновление токена доступа."""
+        """Bearer token refreshing."""
         print("REFRESHING TOKEN...")
         self.token = self.get_token()
         self.headers["Authorization"] = f"Bearer {self.token}"
@@ -74,12 +85,14 @@ class MarzbanAPI:
         data: dict = None,
         params: dict = None,
         headers: dict = None,
+        api_url: str = None,
     ):
-        """Функция для создания запросов к серверу."""
+        """Async requests to server via HTTP."""
 
         async with aiohttp.ClientSession() as session:
             async with session.request(
-                method, self.api_address + path,
+                method,
+                url=(api_url or self.api_url) + path,
                 json=data,
                 headers=headers or self.headers,
                 params=params,
@@ -95,8 +108,6 @@ class MarzbanAPI:
                     await self._request(method, path, data=data)
 
                 else:
-                    print("PATH: ", self.api_address + path)
-                    print("DATA: ", data)
                     raise Exception(f"Error: {resp.status}; Body: {await resp.text()}; Data: {data}")
 
 # ADMIN
@@ -151,7 +162,12 @@ class MarzbanAPI:
         limit: Optional[int] = None,
         username: Optional[str] = None,
     ):
-        params = {"offset": offset, "limit": limit, "username": username}
+        params = {
+            "offset": offset,
+            "limit": limit,
+            "username": username,
+        }
+        params = remove_nones(params)
         resp = await self._request(Methods.GET, "/admins", params=params)
         return [Admin(**data) for data in resp]
 
@@ -250,7 +266,11 @@ class MarzbanAPI:
         start: Optional[str] = "",
         end: Optional[str] = "",
     ) -> NodesUsageResponse:
-        params = {"start": start, "end": end}
+        params = {
+            "start": start,
+            "end": end,
+        }
+        params = remove_nones(params)
         resp = await self._request(Methods.GET, "nodes/usage", params=params)
         return NodesUsageResponse(**resp)
 
@@ -265,8 +285,12 @@ class MarzbanAPI:
         return SubscriptionUserResponse(**resp)
 
     async def user_get_usage(self, token: str, start: Optional[str] = "", end: Optional[str] = "") -> Any:
-        headers = {"start": start, "end": end}
-        return await self._request(Methods.GET, f"/{self.sub_path}/{token}/usage", headers=headers)
+        params = {
+            "start": start,
+            "end": end,
+        }
+        params = remove_nones(params)
+        return await self._request(Methods.GET, f"/{self.sub_path}/{token}/usage", params=params)
 
     async def user_subscription_with_client_type(
         self,
@@ -458,14 +482,24 @@ class MarzbanAPI:
             "status": status,
             "sort": sort,
         }
+        remove_nones(params)
         resp = await self._request(Methods.GET, "/users", params=params)
         return UsersResponse(**resp)
 
     async def reset_users_usage_data(self) -> None:
         return await self._request(Methods.POST, "/users/reset")
 
-    async def get_user_usage(self, username: Any, start: Optional[str] = "", end: Optional[str] = "") -> UserUsageResponse:
-        params = {"start": start, "end": end}
+    async def get_user_usage(
+        self,
+        username: Any,
+        start: Optional[str] = "",
+        end: Optional[str] = "",
+    ) -> UserUsageResponse:
+        params = {
+            "start": start,
+            "end": end,
+        }
+        params = remove_nones(params)
         resp = await self._request(Methods.GET, f"/user/{username}/usage", params=params)
         return UserUsageResponse(**resp)
 
@@ -479,7 +513,12 @@ class MarzbanAPI:
         end: Optional[str] = "",
         admin: Optional[List[str]] = None,
     ) -> UsersUsagesResponse:
-        params = {"start": start, "end": end, "admin": admin}
+        params = {
+            "start": start,
+            "end": end,
+            "admin": admin,
+        }
+        params = remove_nones(params)
         resp = await self._request(Methods.GET, "/users/usage", params=params)
         return UsersUsagesResponse(**resp)
 
@@ -493,7 +532,11 @@ class MarzbanAPI:
         expired_after: Optional[str] = None,
         expired_before: Optional[str] = None,
     ) -> UsersResponse: # TODO: check returned data
-        params = {"expired_after": expired_after, "expired_before": expired_before}
+        params = {
+            "expired_after": expired_after,
+            "expired_before": expired_before,
+        }
+        params = remove_nones(params)
         resp = await self._request(Methods.GET, "/users/expired", params=params)
         return UsersResponse(**resp)
 
@@ -502,5 +545,9 @@ class MarzbanAPI:
         expired_after: Optional[str] = None,
         expired_before: Optional[str] = None,
     ) -> None:
-        params = {"expired_after": expired_after, "expired_before": expired_before}
+        params = {
+            "expired_after": expired_after,
+            "expired_before": expired_before,
+        }
+        params = remove_nones(params)
         return await self._request(Methods.DELETE, "/users/expired", params=params)

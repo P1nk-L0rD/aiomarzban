@@ -1,7 +1,7 @@
 import asyncio
 import os
 
-from load_dotenv import load_dotenv
+from dotenv import load_dotenv
 
 from aiomarzban.api import MarzbanAPI
 
@@ -20,7 +20,9 @@ marzban = MarzbanAPI(
 
 
 async def main():
-    data = await marzban.get_node_settings()
+    admins = await marzban.get_admins()
+    print(admins)
+    data = await marzban.modify_admin(username="admin", is_sudo=False, telegram_id=1)
     print(data)
 
 

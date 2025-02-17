@@ -1,4 +1,5 @@
 import datetime
+from typing import Dict
 
 
 def current_unix_utc_time() -> int:
@@ -29,3 +30,6 @@ def unix_time_delta(days: int = 0, hours: int = 0, minutes: int = 0) -> int:
 def gb_to_bytes(amount_of_gb: int) -> int:
     return amount_of_gb * 1024 ** 3
 
+
+def remove_nones(data: Dict[str, str]) -> dict:
+    return {k: v for k, v in data.items() if v is not None}
