@@ -3,14 +3,13 @@ from typing import Optional, List, Any, Dict
 import aiohttp
 import requests
 
-from .enums import UserDataLimitResetStrategy
-from .utils import remove_nones
+from .enums import UserDataLimitResetStrategy, Methods
 from .exceptions import MarzbanException
-from .methods import Methods
 from .models import Admin, AdminCreate, AdminModify, CoreStats, NodeCreate, NodeModify, NodeResponse, NodeSettings, \
     NodeStatus, NodesUsageResponse, SubscriptionUserResponse, SystemStats, ProxyInbound, ProxyHost, \
     UserTemplateResponse, UserTemplateCreate, UserTemplateModify, NextPlanModel, UserStatusCreate, UserCreate, \
     UserModify, UserResponse, UserStatusModify, UserStatus, UsersResponse, UserUsageResponse, UsersUsagesResponse
+from .utils import remove_nones
 
 
 class MarzbanAPI:

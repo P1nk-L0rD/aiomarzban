@@ -1,6 +1,13 @@
 from enum import Enum
 
 
+class Methods(str, Enum):
+    POST = "POST"
+    GET = "GET"
+    PUT = "PUT"
+    DELETE = "DELETE"
+
+
 class UserStatusCreate(str, Enum):
     active = "active"
     on_hold = "on_hold"
