@@ -4,7 +4,6 @@ import os
 from load_dotenv import load_dotenv
 
 from aiomarzban.api import MarzbanAPI
-from aiomarzban.models import UserResponse
 
 load_dotenv()
 
@@ -21,8 +20,8 @@ marzban = MarzbanAPI(
 
 
 async def main():
-    # data = await marzban.
-    ...
+    data = await marzban.get_node_settings()
+    print(data)
 
 
 if __name__ == "__main__":

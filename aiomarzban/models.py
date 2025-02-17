@@ -57,7 +57,7 @@ class NodeBase(BaseModel):
     address: str
     port: Optional[int] = 62050
     api_port: Optional[int] = 62051
-    usage_coefficient:Optional[float] = 1
+    usage_coefficient: Optional[float] = 1
 
 
 class NodeCreate(NodeBase):
