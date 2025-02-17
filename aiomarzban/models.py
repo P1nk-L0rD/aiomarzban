@@ -180,8 +180,8 @@ class UserCreate(BaseModel):
     proxies: Dict[str, Any]
     expire: Optional[int] = None
     data_limit: Optional[int] = None
-    data_limit_reset_strategy: UserDataLimitResetStrategy = UserDataLimitResetStrategy.no_reset
-    inbounds: Dict[str, List[str]] = {}
+    data_limit_reset_strategy: Optional[UserDataLimitResetStrategy] = UserDataLimitResetStrategy.no_reset
+    inbounds: Optional[Dict[str, List[str]]] = {}
     note: Optional[str] = None
     sub_updated_at: Optional[str] = None
     sub_last_user_agent: Optional[str] = None
@@ -191,7 +191,7 @@ class UserCreate(BaseModel):
     auto_delete_in_days: Optional[int] = None
     next_plan: Optional[NextPlanModel] = None
     username: str
-    status: UserStatusCreate
+    status: Optional[UserStatusCreate] = None
 
 
 class UserModify(BaseModel):
