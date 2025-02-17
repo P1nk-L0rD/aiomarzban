@@ -4,6 +4,7 @@ import os
 from load_dotenv import load_dotenv
 
 from aiomarzban.api import MarzbanAPI
+from aiomarzban.models import UserResponse
 
 load_dotenv()
 
@@ -17,3 +18,13 @@ marzban = MarzbanAPI(
     username=MARZBAN_USERNAME,
     password=MARZBAN_PASSWORD,
 )
+
+
+async def main():
+    # data = await marzban.
+    ...
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
