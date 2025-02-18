@@ -153,7 +153,7 @@ class SystemStats(BaseModel):
     mem_used: int
     cpu_cores: int
     cpu_usage: float
-    total_users: int
+    total_user: int # TODO: should be total_users
     online_users: int
     users_active: int
     users_on_hold: int
@@ -195,11 +195,11 @@ class UserCreate(BaseModel):
 
 
 class UserModify(BaseModel):
-    proxies: Dict[str, Any] = {}
+    proxies: Optional[Dict[str, Any]] = {}
     expire: Optional[int] = None
     data_limit: Optional[int] = None
     data_limit_reset_strategy: Optional[UserDataLimitResetStrategy] = None
-    inbounds: Dict[str, List[str]] = {}
+    inbounds: Optional[Dict[str, List[str]]] = None
     note: Optional[str] = None
     sub_updated_at: Optional[str] = None
     sub_last_user_agent: Optional[str] = None
@@ -225,8 +225,9 @@ class UserResponse(BaseModel):
     auto_delete_in_days: Optional[int] = None
     next_plan: Optional[NextPlanModel] = None
     username: str
-    status: UserStatusModify
+    status: UserStatus
     used_traffic: int
+    lifetime_used_traffic: Optional[int] = 0
     created_at: str
     links: List[str] = []
     subscription_url: str = ""
@@ -240,7 +241,7 @@ class UserTemplateCreate(BaseModel):
     expire_duration: Optional[int] = None
     username_prefix: Optional[str] = None
     username_suffix: Optional[str] = None
-    inbounds: Dict[str, List[str]] = {}
+    inbounds: Optional[Dict[str, List[str]]] = {}
 
 
 class UserTemplateModify(UserTemplateCreate):
@@ -275,3 +276,7 @@ class ValidationError(BaseModel):
     loc: Any
     msg: str
     type: str
+
+
+class SetOwner(BaseModel):
+    admin_username: str

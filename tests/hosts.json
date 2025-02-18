@@ -1,0 +1,22 @@
+{
+    "VLESS host": [
+        {
+            "remark": "Test host",
+            "address": "8.8.8.8",
+            "port": 11111,
+            "sni": null,
+            "host": null,
+            "path": null,
+            "security": "inbound_default",
+            "alpn": "",
+            "fingerprint": "",
+            "allowinsecure": null,
+            "is_disabled": false,
+            "mux_enable": false,
+            "fragment_setting": null,
+            "noise_setting": null,
+            "random_user_agent": false,
+            "use_sni_as_host": false
+        }
+    ]
+}

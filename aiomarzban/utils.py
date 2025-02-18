@@ -34,9 +34,4 @@ def gb_to_bytes(amount_of_gb: int) -> int:
 
 
 def remove_nones(data: Dict[str, str]) -> dict:
-    new_dict = {}
-    for key, value in data.items():
-        if value:
-            new_dict[key] = value
-    return new_dict
     return {k: v for k, v in data.items() if v is not None}

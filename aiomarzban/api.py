@@ -1,17 +1,18 @@
-import json
-from typing import Optional, List, Any, Dict
+import copy
 import datetime
+from typing import Optional, List, Any, Dict
 
 import aiohttp
-import copy
 import requests
+from aiohttp.client_exceptions import ClientConnectorError
 
 from .enums import UserDataLimitResetStrategy, Methods
 from .exceptions import MarzbanException
 from .models import Admin, AdminCreate, AdminModify, CoreStats, NodeCreate, NodeModify, NodeResponse, NodeSettings, \
     NodeStatus, NodesUsageResponse, SubscriptionUserResponse, SystemStats, ProxyInbound, ProxyHost, \
     UserTemplateResponse, UserTemplateCreate, UserTemplateModify, NextPlanModel, UserStatusCreate, UserCreate, \
-    UserModify, UserResponse, UserStatusModify, UserStatus, UsersResponse, UserUsageResponse, UsersUsagesResponse
+    UserModify, UserResponse, UserStatusModify, UserStatus, UsersResponse, UserUsageResponse, UsersUsagesResponse, \
+    SetOwner
 from .utils import remove_nones, future_unix_time, gb_to_bytes, current_unix_utc_time, unix_time_delta
 
 
@@ -35,6 +36,10 @@ class MarzbanAPI:
         default_auto_delete_in_days: Optional[int] = None,
         default_next_plan: Optional[NextPlanModel] = None,
         default_status: Optional[UserStatusCreate] = None,
+
+        # Settings
+        timeout: Optional[int] = 8,
+        retries: Optional[int] = 1,
     ):
         """
         Provide password, username and password to create api client.
@@ -54,11 +59,13 @@ class MarzbanAPI:
         :param default_auto_delete_in_days: Default auto delete in days.
         :param default_next_plan: Default next plan.
         :param default_status: Default user status.
+        :param timeout: Default timeout in seconds.
+        :param retries: Default number of retries (after first unsuccessful request).
         """
         self.address = address
         self.api_url = address + "api"
-        self.username = username
-        self.password = password
+        self.username = str(username)
+        self.password = str(password)
         self.sub_path = sub_path
         self.token = self.get_token()
         self.headers = {
@@ -79,6 +86,10 @@ class MarzbanAPI:
         self.default_next_plan = default_next_plan
         self.default_status = default_status or UserStatus.active
 
+        # Settings
+        self.timeout = timeout
+        self.retries = retries
+
     def get_token(self) -> str:
         """Bearer token creation."""
         data = {
@@ -97,7 +108,7 @@ class MarzbanAPI:
         self.token = self.get_token()
         self.headers["Authorization"] = f"Bearer {self.token}"
 
-    async def _request(
+    async def _async_request(
         self,
         method: str,
         path: str,
@@ -116,6 +127,7 @@ class MarzbanAPI:
                 headers=headers or self.headers,
                 params=params,
                 ssl=False,
+                timeout=self.timeout,
             ) as resp:
                 if 200 <= resp.status < 300:
                     body = await resp.json()
@@ -123,10 +135,30 @@ class MarzbanAPI:
 
                 elif resp.status == 401:
                     self.refresh_token()
-                    return await self._request(method, path, data=data)
+                    return await self._async_request(method, path, data=data)
 
                 else:
                     raise Exception(f"Error: {resp.status}; Body: {await resp.text()}; Data: {data}")
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        data: dict = None,
+        params: dict = None,
+        headers: dict = None,
+        api_url: str = None,
+    ):
+        """Send request with retries."""
+
+        for attempt in range(self.retries + 1):
+            try:
+                return await self._async_request(method, path, data, params, headers, api_url)
+            except ClientConnectorError:
+                if attempt < self.retries:
+                    continue
+                else:
+                    raise
 
 # ADMIN
 
@@ -136,15 +168,15 @@ class MarzbanAPI:
 
     async def create_admin(
         self,
-        username: str,
+        username: Any,
         password: str,
-        is_sudo: bool,
+        is_sudo: Optional[bool] = False,
         telegram_id: Optional[int] = None,
         discord_webhook: Optional[str] = None,
         users_usage: Optional[int] = None,
     ) -> Admin:
         data = AdminCreate(
-            username=username,
+            username=str(username),
             password=password,
             is_sudo=is_sudo,
             telegram_id=telegram_id,
@@ -156,7 +188,7 @@ class MarzbanAPI:
 
     async def modify_admin(
         self,
-        username: str,
+        username: Any,
         is_sudo: bool,
         password: Optional[str] = None,
         telegram_id: Optional[int] = None,
@@ -171,7 +203,7 @@ class MarzbanAPI:
         resp = await self._request(Methods.PUT, f"/admin/{username}", data=data.model_dump())
         return Admin(**resp)
 
-    async def remove_admin(self, username: str) -> None:
+    async def remove_admin(self, username: Any) -> None:
         return await self._request(Methods.DELETE, f"/admin/{username}")
 
     async def get_admins(
@@ -189,17 +221,17 @@ class MarzbanAPI:
         resp = await self._request(Methods.GET, "/admins", params=params)
         return [Admin(**data) for data in resp]
 
-    async def disable_all_active_users(self, username: str) -> None:
+    async def disable_all_active_users(self, username: Any) -> None:
         return await self._request(Methods.POST, f"/admin/{username}/users/disable")
 
-    async def activate_all_disabled_users(self, username: str) -> None:
+    async def activate_all_disabled_users(self, username: Any) -> None:
         return await self._request(Methods.POST, f"/admin/{username}/users/activate")
 
-    async def reset_admin_usage(self, username: str) -> Admin:
+    async def reset_admin_usage(self, username: Any) -> Admin:
         resp = await self._request(Methods.POST, f"/admin/usage/reset/{username}")
         return Admin(**resp)
 
-    async def get_admin_usage(self, username: str) -> int:
+    async def get_admin_usage(self, username: Any) -> int:
         return await self._request(Methods.GET, f"/admin/usage/{username}")
 
 # CORE
@@ -216,7 +248,7 @@ class MarzbanAPI:
 
     async def modify_core_config(self, config: dict) -> dict:
         resp = await self._request(Methods.PUT, "/core/config", data=config)
-        return resp.json()
+        return resp
 
 # NODE
 
@@ -338,7 +370,7 @@ class MarzbanAPI:
 
     async def add_user_template(
         self,
-        name: Optional[str] = None,
+        name: Optional[Any] = None,
         data_limit: Optional[int] = None,
         expire_duration: Optional[int] = None,
         username_prefix: Optional[str] = None,
@@ -346,8 +378,8 @@ class MarzbanAPI:
         inbounds: Optional[Dict[str, Any]] = None,
     ) -> UserTemplateResponse:
         data = UserTemplateCreate(
-            name=name,
-            data_limit=data_limit,
+            name=str(name),
+            data_limit=gb_to_bytes(data_limit),
             expire_duration=expire_duration,
             username_prefix=username_prefix,
             username_suffix=username_suffix,
@@ -376,13 +408,13 @@ class MarzbanAPI:
     ) -> UserTemplateResponse:
         data = UserTemplateModify(
             name=name,
-            data_limit=data_limit,
+            data_limit=gb_to_bytes(data_limit),
             expire_duration=expire_duration,
             username_prefix=username_prefix,
             username_suffix=username_suffix,
-            inbounds=inbounds,
+            inbounds=inbounds or dict(),
         )
-        resp = await self._request(Methods.PUT, f"/user_template/{template_id}", data=data.model_dump())
+        resp = await self._request(Methods.PUT, f"/user_template/{template_id}", data=data.model_dump(exclude_none=True))
         return UserTemplateResponse(**resp)
 
     async def remove_user_template(self, template_id) -> None:
@@ -392,8 +424,8 @@ class MarzbanAPI:
 
     async def add_user(
         self,
-        username: str,
-        proxies: Optional[Dict[str, List[ProxyHost]]] = None,
+        username: Any,
+        proxies: Optional[Dict[str, Any]] = None,
         expire: Optional[int] = None,
         days: Optional[int] = None,
         data_limit: Optional[int] = None,
@@ -453,7 +485,7 @@ class MarzbanAPI:
             on_hold_timeout=on_hold_timeout or self.default_on_hold_timeout,
             auto_delete_in_days=auto_delete_in_days or self.default_auto_delete_in_days,
             next_plan=next_plan or self.default_next_plan,
-            username=username,
+            username=str(username),
             status=status or self.default_status,
         )
 
@@ -466,7 +498,7 @@ class MarzbanAPI:
 
     async def modify_user(
         self,
-        username: str,
+        username: Any,
         proxies: Optional[Dict[str, List[ProxyHost]]] = None,
         expire: Optional[int] = None,
         data_limit: Optional[int] = None,
@@ -498,7 +530,7 @@ class MarzbanAPI:
             next_plan=next_plan,
             status=status,
         )
-        resp = await self._request(Methods.PUT, f"/user/{username}", data=data.model_dump())
+        resp = await self._request(Methods.PUT, f"/user/{username}", data=data.model_dump(exclude_none=True))
         return UserResponse(**resp)
 
     async def remove_user(self, username: Any) -> None:
@@ -521,7 +553,7 @@ class MarzbanAPI:
         admin: Optional[List[str]] = None,
         status: Optional[UserStatus] = None,
         sort: Optional[str] = None,
-    ) -> UsersResponse: # TODO: check method
+    ) -> UsersResponse:
         params = {
             "offset": offset,
             "limit": limit,
@@ -571,29 +603,28 @@ class MarzbanAPI:
         resp = await self._request(Methods.GET, "/users/usage", params=params)
         return UsersUsagesResponse(**resp)
 
-    async def set_owner(self, username: str, admin_username: Any) -> UserResponse:
-        data = {"admin_username": str(admin_username)}
-        resp = await self._request(Methods.PUT, f"/user/{username}/set-owner", data=data)
+    async def set_owner(self, username: Any, admin_username: Any) -> UserResponse:
+        data = SetOwner(admin_username=admin_username)
+        resp = await self._request(Methods.PUT, f"/user/{username}/set-owner", data=data.model_dump())
         return UserResponse(**resp)
 
     async def get_expired_users(
         self,
         expired_after: Optional[str] = None,
         expired_before: Optional[str] = None,
-    ) -> UsersResponse: # TODO: check returned data
+    ) -> List[str]:
         params = {
             "expired_after": expired_after,
             "expired_before": expired_before,
         }
         params = remove_nones(params)
-        resp = await self._request(Methods.GET, "/users/expired", params=params)
-        return UsersResponse(**resp)
+        return await self._request(Methods.GET, "/users/expired", params=params)
 
     async def delete_expired_users(
         self,
         expired_after: Optional[str] = None,
         expired_before: Optional[str] = None,
-    ) -> None:
+    ) -> List[str]:
         params = {
             "expired_after": expired_after,
             "expired_before": expired_before,
@@ -603,14 +634,14 @@ class MarzbanAPI:
 
 # EXTRA (not default methods)
 
-    async def user_get_or_create(self, username: str, **kwargs: Any) -> UserResponse:
+    async def user_get_or_create(self, username: Any, **kwargs: Any) -> UserResponse:
         try:
             return await self.get_user(username)
         except Exception as e:
             print(e)
             return await self.add_user(username, **kwargs)
 
-    async def user_add_days(self, username: str, days: int) -> UserResponse:
+    async def user_add_days(self, username: Any, days: int) -> UserResponse:
         """
         Adds days to users subscription. If the user's subscription has expired,
         it will be issued for the specified number of days from the current moment.
