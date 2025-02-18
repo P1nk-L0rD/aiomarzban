@@ -3,7 +3,7 @@ from .enums import UserStatus, UserDataLimitResetStrategy, NodeStatus, ProxyHost
     ProxyHostFingerprint
 from .models import Admin, CoreStats, NextPlanModel, NodeResponse, NodeSettings, UserResponse, ProxyHost, ProxyInbound, \
     SubscriptionUserResponse, SystemStats, UserTemplateResponse, UserUsageResponse, UserUsagesResponse, UsersResponse, \
-    UsersUsagesResponse, UserStatusCreate
+    UsersUsagesResponse, UserStatusCreate, UserStatusModify
 
 __all__ = (
     "__version__",
@@ -30,7 +30,8 @@ __all__ = (
     "ProxyTypes",
     "ProxyHostSecurity",
     "ProxyHostFingerprint",
-    "UserStatusCreate"
+    "UserStatusCreate",
+    "UserStatusModify",
 )
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

@@ -176,6 +176,7 @@ class Unauthorized(BaseModel):
 
 # USER
 
+
 class UserCreate(BaseModel):
     proxies: Dict[str, Any]
     expire: Optional[int] = None

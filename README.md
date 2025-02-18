@@ -1,6 +1,7 @@
 # aiomarzban
 
-Async SDK for the Marzban API based on aiohttp, requests, and pydantic. This library is fully compatible with **Marzban version 0.8.4** and supports all panel methods.
+Async SDK for the Marzban API based on aiohttp, requests, and pydantic.
+This library is fully compatible with **Marzban version 0.8.4** and supports all panel methods.
 
 ## Features
 
@@ -20,8 +21,63 @@ Async SDK for the Marzban API based on aiohttp, requests, and pydantic. This lib
 pip install aiomarzban
 ```
 
-
 ## Examples
+
+```python
+from aiomarzban import MarzbanAPI, UserDataLimitResetStrategy, UserStatusModify
+
+marzban = MarzbanAPI(
+    address="https://my_domain.com/",
+    username="admin",
+    password="super_secret_password",
+    default_proxies={"vless": {"flow": ""}},
+)
+
+async def main():
+    # Create admin
+    new_admin = await marzban.create_admin(username="new_admin", password="12345678", is_sudo=False)
+    print("New admin: ", new_admin)
+
+    # Create user
+    new_user = await marzban.add_user(
+        username="user1",
+        days=90,
+        data_limit=100, # In GB
+        data_limit_reset_strategy=UserDataLimitResetStrategy.month,
+    )
+    print("New user: ", new_user)
+
+    # Modify user
+    modified_user = await marzban.modify_user(
+        username="user1",
+        status=UserStatusModify.disabled,
+    )
+    print("Modified user: ", modified_user)
+
+    # Add days of subscription to user
+    modified_user = await marzban.user_add_days("user1", 60)
+    print("Modified user: ", modified_user)
+
+    # Get users
+    users = await marzban.get_users(offset=0, limit=100)
+    print("Users: ", users)
+    
+    # Create node
+    new_node = await marzban.add_node(
+        name="New node",
+        address="8.8.8.8",
+    )
+    print("New node: ", new_node)
+
+    # Modify node
+    modified_node = await marzban.modify_node(
+        node_id=new_node.id,
+        usage_coefficient=0.2,
+    )
+    print("Modified node: ", modified_node)
+
+    # Examples for all methods in /examples/examples.py
+```
 
 
 ## Test coverage
@@ -56,11 +112,12 @@ We welcome contributions! Please follow these steps:
 
 ## Tasks
 
-1. Fix tests to avoid timeouts
+1. Fix tests to avoid freezing
 2. Tests for subscription
 3. ~~Timeout for requests~~
 4. ~~Retries for requests~~
 5. More custom useful methods
+6. Create library in PyPi
 
 ## License
 
