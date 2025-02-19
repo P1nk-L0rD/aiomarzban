@@ -117,7 +117,8 @@ We welcome contributions! Please follow these steps:
 3. ~~Timeout for requests~~
 4. ~~Retries for requests~~
 5. More custom useful methods
-6. Create library in PyPi
+6. ~~Create library in PyPi~~
+7. Find and remove bugs :)
 
 ## License
 
