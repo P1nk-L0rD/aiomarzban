@@ -1,7 +1,7 @@
 # aiomarzban
 
 Async SDK for the Marzban API based on aiohttp, requests, and pydantic.
-This library is fully compatible with **Marzban version 0.8.4** and supports all panel methods.
+This library is fully compatible with **[Marzban](https://github.com/Gozargah/Marzban) version 0.8.4** and supports all panel methods.
 
 ## Features
 
@@ -75,9 +75,9 @@ async def main():
         usage_coefficient=0.2,
     )
     print("Modified node: ", modified_node)
-
-    # Examples for all methods in /examples/examples.py
 ```
+
+[Examples for all methods](https://github.com/P1nk-L0rD/aiomarzban/blob/main/examples/examples.py)
 
 
 ## Test coverage
