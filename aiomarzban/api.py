@@ -311,7 +311,7 @@ class MarzbanAPI:
     async def reconnect_node(self, node_id: int) -> None:
         return await self._request(Methods.POST, f"/node/{node_id}/reconnect")
 
-    async def get_node_usage(
+    async def get_nodes_usage(
         self,
         start: Optional[str] = "",
         end: Optional[str] = "",
@@ -366,7 +366,7 @@ class MarzbanAPI:
     async def modify_hosts(self, hosts: Dict[str, List[ProxyHost]]) -> Dict[str, List[ProxyHost]]:
         return await self._request(Methods.PUT, "/hosts", data=hosts)
 
-# USER TEMPLATES
+# USER TEMPLATE
 
     async def add_user_template(
         self,

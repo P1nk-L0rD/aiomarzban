@@ -117,7 +117,8 @@ We welcome contributions! Please follow these steps:
 3. ~~Timeout for requests~~
 4. ~~Retries for requests~~
 5. More custom useful methods
-6. Create library in PyPi
+6. ~~Create library in PyPi~~
+7. Find and remove bugs :)
 
 ## License
 
@@ -125,4 +126,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For questions, suggestions, or feedback, please reach out to [my telegram](https://t.me/IMC_tech).
+For questions, suggestions, or feedback, please reach out to [my telegram](https://t.me/IMC_tech) or mestepanik@gmail.com.
