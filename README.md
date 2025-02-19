@@ -110,6 +110,8 @@ We welcome contributions! Please follow these steps:
 4. Run tests to ensure everything works (optional).
 5. Submit a pull request.
 
+Or [create an issue](https://github.com/P1nk-L0rD/aiomarzban/issues)
+
 ## Tasks
 
 1. Fix tests to avoid freezing
