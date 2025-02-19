@@ -33,5 +33,11 @@ def gb_to_bytes(amount_of_gb: int) -> int:
     return amount_of_gb
 
 
+def bytes_to_gb(amount_of_bytes: int) -> int:
+    if amount_of_bytes:
+        return round(amount_of_bytes / (1024 ** 3), 2)
+    return amount_of_bytes
+
+
 def remove_nones(data: Dict[str, str]) -> dict:
     return {k: v for k, v in data.items() if v is not None}

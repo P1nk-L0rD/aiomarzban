@@ -29,7 +29,7 @@ setup(
     'License :: OSI Approved :: MIT License',
     'Operating System :: OS Independent'
     ],
-    keywords=["aiomarzban", "marzban", "marzban API", "marzban SDK", "Gozargah", "marzpy"],
+    keywords=["aiomarzban", "marzban", "marzban API", "marzban SDK", "Gozargah", "marzpy", "marz"],
     project_urls={
         "Homepage": "https://github.com/P1nk-L0rD/aiomarzban",
         "Source": "https://github.com/P1nk-L0rD/aiomarzban",
