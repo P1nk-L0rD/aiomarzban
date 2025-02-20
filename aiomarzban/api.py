@@ -1,9 +1,9 @@
 import copy
 import datetime
+from http import HTTPStatus
 from typing import Optional, List, Any, Dict
-
+from asyncio.exceptions import TimeoutError
 import aiohttp
-import requests
 from aiohttp.client_exceptions import ClientConnectorError
 
 from .enums import UserDataLimitResetStrategy, Methods
@@ -12,8 +12,9 @@ from .models import Admin, AdminCreate, AdminModify, CoreStats, NodeCreate, Node
     NodeStatus, NodesUsageResponse, SubscriptionUserResponse, SystemStats, ProxyInbound, ProxyHost, \
     UserTemplateResponse, UserTemplateCreate, UserTemplateModify, NextPlanModel, UserStatusCreate, UserCreate, \
     UserModify, UserResponse, UserStatusModify, UserStatus, UsersResponse, UserUsageResponse, UsersUsagesResponse, \
-    SetOwner
-from .utils import remove_nones, future_unix_time, gb_to_bytes, current_unix_utc_time, unix_time_delta
+    SetOwner, OffsetLimitUsernameParams, StartEndParams, GetUsersParams, ExpiredBeforeAfterParams, StartEndAdminParams, \
+    AdminTokenPost, AdminTokenAnswer
+from .utils import future_unix_time, gb_to_bytes, current_unix_utc_time, unix_time_delta
 
 
 class MarzbanAPI:
@@ -37,8 +38,14 @@ class MarzbanAPI:
         default_next_plan: Optional[NextPlanModel] = None,
         default_status: Optional[UserStatusCreate] = None,
 
-        # Settings
-        timeout: Optional[int] = 8,
+        # Token settings
+        grant_type: Optional[str] = None,
+        scope: Optional[str] = "",
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
+
+        # Request settings
+        timeout: Optional[int] = 10,
         retries: Optional[int] = 1,
     ):
         """
@@ -59,6 +66,10 @@ class MarzbanAPI:
         :param default_auto_delete_in_days: Default auto delete in days.
         :param default_next_plan: Default next plan.
         :param default_status: Default user status.
+        :param grant_type: Grant type.
+        :param scope: Scope.
+        :param client_id: Client ID.
+        :param client_secret: Client Secret.
         :param timeout: Default timeout in seconds.
         :param retries: Default number of retries (after first unsuccessful request).
         """
@@ -67,11 +78,8 @@ class MarzbanAPI:
         self.username = str(username)
         self.password = str(password)
         self.sub_path = sub_path
-        self.token = self.get_token()
-        self.headers = {
-            "Accept": "application/json",
-            "Authorization": f"Bearer {self.token}"
-        }
+        self.headers = None
+        self.encoded_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
         # Default user params
         self.default_days = default_days
@@ -86,56 +94,60 @@ class MarzbanAPI:
         self.default_next_plan = default_next_plan
         self.default_status = default_status or UserStatus.active
 
-        # Settings
+        # Token settings
+        self.token_data = AdminTokenPost(
+            grant_type=grant_type,
+            username=username,
+            password=password,
+            scope=scope,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
+        # Request settings
         self.timeout = timeout
         self.retries = retries
-
-    def get_token(self) -> str:
-        """Bearer token creation."""
-        data = {
-            "username": self.username,
-            "password": self.password,
-        }
-        answer = requests.post(self.api_url + "/admin/token", data=data)
-        if answer.status_code != 200:
-            raise MarzbanException(f"Error: {answer.status_code}; Body: {answer.json()}")
-
-        return answer.json()["access_token"]
-
-    def refresh_token(self):
-        """Bearer token refreshing."""
-        print("REFRESHING TOKEN...")
-        self.token = self.get_token()
-        self.headers["Authorization"] = f"Bearer {self.token}"
 
     async def _async_request(
         self,
         method: str,
         path: str,
-        data: dict = None,
-        params: dict = None,
-        headers: dict = None,
-        api_url: str = None,
+        data: Optional[dict] = None,
+        not_json_data: Optional[dict] = None,
+        params: Optional[dict] = None,
+        headers: Optional[dict] = None,
+        api_url: Optional[str] = None,
+        timeout: Optional[int] = None,
+        allow_empty_headers: Optional[bool] = False,
     ):
         """Async requests to server via HTTP."""
+
+        if headers is None and self.headers is None and not allow_empty_headers:
+            await self.refresh_credentials()
 
         async with aiohttp.ClientSession() as session:
             async with session.request(
                 method,
                 url=(api_url or self.api_url) + path,
                 json=data,
+                data=not_json_data,
                 headers=headers or self.headers,
                 params=params,
                 ssl=False,
-                timeout=self.timeout,
+                timeout=timeout or self.timeout,
             ) as resp:
-                if 200 <= resp.status < 300:
-                    body = await resp.json()
-                    return body
+                ans = await resp.json()
+                if HTTPStatus.OK <= resp.status <= HTTPStatus.IM_USED:
+                    return ans
 
-                elif resp.status == 401:
-                    self.refresh_token()
-                    return await self._async_request(method, path, data=data)
+                elif resp.status == HTTPStatus.UNAUTHORIZED:
+                    error = ans.get("detail")
+                    if error == "Could not validate credentials":
+                        await self.refresh_credentials()
+                        return await self._async_request(method, path, data=data)
+                    elif error == "Incorrect username or password":
+                        raise MarzbanException(error)
+                    raise MarzbanException(f"Auth error: {error}")
 
                 else:
                     raise Exception(f"Error: {resp.status}; Body: {await resp.text()}; Data: {data}")
@@ -144,23 +156,48 @@ class MarzbanAPI:
         self,
         method: str,
         path: str,
-        data: dict = None,
-        params: dict = None,
-        headers: dict = None,
-        api_url: str = None,
+        data: Optional[dict] = None,
+        not_json_data: Optional[dict] = None,
+        params: Optional[dict] = None,
+        headers: Optional[dict] = None,
+        api_url: Optional[str] = None,
+        timeout: Optional[int] = None,
+        allow_empty_headers: Optional[bool] = False,
     ):
         """Send request with retries."""
 
         for attempt in range(self.retries + 1):
             try:
-                return await self._async_request(method, path, data, params, headers, api_url)
-            except ClientConnectorError:
+                return await self._async_request(
+                    method=method,
+                    path=path,
+                    data=data,
+                    not_json_data=not_json_data,
+                    params=params,
+                    headers=headers,
+                    api_url=api_url,
+                    timeout=timeout,
+                    allow_empty_headers=allow_empty_headers,
+                )
+            except (ClientConnectorError, TimeoutError):
                 if attempt < self.retries:
                     continue
                 else:
                     raise
 
 # ADMIN
+
+    async def refresh_credentials(self) -> None:
+        resp = await self._request(
+            Methods.POST, "/admin/token",
+            not_json_data=self.token_data.model_dump(exclude_none=True),
+            allow_empty_headers=True,
+        )
+        resp = AdminTokenAnswer(**resp)
+        self.headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {resp.access_token}"
+        }
 
     async def get_current_admin(self) -> Admin:
         resp = await self._request(Methods.GET, "/admin")
@@ -212,13 +249,8 @@ class MarzbanAPI:
         limit: Optional[int] = None,
         username: Optional[str] = None,
     ):
-        params = {
-            "offset": offset,
-            "limit": limit,
-            "username": username,
-        }
-        params = remove_nones(params)
-        resp = await self._request(Methods.GET, "/admins", params=params)
+        params = OffsetLimitUsernameParams(offset=offset, limit=limit, username=username)
+        resp = await self._request(Methods.GET, "/admins", params=params.model_dump(exclude_none=True))
         return [Admin(**data) for data in resp]
 
     async def disable_all_active_users(self, username: Any) -> None:
@@ -316,12 +348,8 @@ class MarzbanAPI:
         start: Optional[str] = "",
         end: Optional[str] = "",
     ) -> NodesUsageResponse:
-        params = {
-            "start": start,
-            "end": end,
-        }
-        params = remove_nones(params)
-        resp = await self._request(Methods.GET, "nodes/usage", params=params)
+        params = StartEndParams(start=start, end=end)
+        resp = await self._request(Methods.GET, "nodes/usage", params=params.model_dump(exclude_none=True))
         return NodesUsageResponse(**resp)
 
 # SUBSCRIPTION
@@ -335,12 +363,8 @@ class MarzbanAPI:
         return SubscriptionUserResponse(**resp)
 
     async def user_get_usage(self, token: str, start: Optional[str] = "", end: Optional[str] = "") -> Any:
-        params = {
-            "start": start,
-            "end": end,
-        }
-        params = remove_nones(params)
-        return await self._request(Methods.GET, f"/{self.sub_path}/{token}/usage", params=params)
+        params = StartEndParams(start=start, end=end)
+        return await self._request(Methods.GET, f"/{self.sub_path}/{token}/usage", params=params.model_dump(exclude_none=True))
 
     async def user_subscription_with_client_type(
         self,
@@ -553,18 +577,20 @@ class MarzbanAPI:
         admin: Optional[List[str]] = None,
         status: Optional[UserStatus] = None,
         sort: Optional[str] = None,
+        timeout: Optional[int] = 40,
     ) -> UsersResponse:
-        params = {
-            "offset": offset,
-            "limit": limit,
-            "username": username,
-            "search": search,
-            "admin": admin,
-            "status": status,
-            "sort": sort,
-        }
-        params = remove_nones(params)
-        resp = await self._request(Methods.GET, "/users", params=params)
+        params = GetUsersParams(
+            offset=offset,
+            limit=limit,
+            username=username,
+            search=search,
+            admin=admin,
+            status=status,
+            sort=sort,
+        )
+        data = params.model_dump(exclude_none=True)
+        print(type(data), type(data.get("status")))
+        resp = await self._request(Methods.GET, "/users", params=params.model_dump(exclude_none=True), timeout=timeout)
         return UsersResponse(**resp)
 
     async def reset_users_usage_data(self) -> None:
@@ -576,12 +602,8 @@ class MarzbanAPI:
         start: Optional[str] = "",
         end: Optional[str] = "",
     ) -> UserUsageResponse:
-        params = {
-            "start": start,
-            "end": end,
-        }
-        params = remove_nones(params)
-        resp = await self._request(Methods.GET, f"/user/{username}/usage", params=params)
+        params = StartEndParams(start=start, end=end)
+        resp = await self._request(Methods.GET, f"/user/{username}/usage", params=params.model_dump(exclude_none=True))
         return UserUsageResponse(**resp)
 
     async def active_next_plan(self, username: Any) -> UserResponse:
@@ -594,18 +616,17 @@ class MarzbanAPI:
         end: Optional[str] = "",
         admin: Optional[List[str]] = None,
     ) -> UsersUsagesResponse:
-        params = {
-            "start": start,
-            "end": end,
-            "admin": admin,
-        }
-        params = remove_nones(params)
-        resp = await self._request(Methods.GET, "/users/usage", params=params)
+        params = StartEndAdminParams(
+            start=start,
+            end=end,
+            admin=admin,
+        )
+        resp = await self._request(Methods.GET, "/users/usage", params=params.model_dump(exclude_none=True))
         return UsersUsagesResponse(**resp)
 
     async def set_owner(self, username: Any, admin_username: Any) -> UserResponse:
         data = SetOwner(admin_username=admin_username)
-        resp = await self._request(Methods.PUT, f"/user/{username}/set-owner", data=data.model_dump())
+        resp = await self._request(Methods.PUT, f"/user/{username}/set-owner", params=data.model_dump())
         return UserResponse(**resp)
 
     async def get_expired_users(
@@ -613,24 +634,22 @@ class MarzbanAPI:
         expired_after: Optional[str] = None,
         expired_before: Optional[str] = None,
     ) -> List[str]:
-        params = {
-            "expired_after": expired_after,
-            "expired_before": expired_before,
-        }
-        params = remove_nones(params)
-        return await self._request(Methods.GET, "/users/expired", params=params)
+        params = ExpiredBeforeAfterParams(
+            expired_after=expired_after,
+            expired_before=expired_before,
+        )
+        return await self._request(Methods.GET, "/users/expired", params=params.model_dump(exclude_none=True))
 
     async def delete_expired_users(
         self,
         expired_after: Optional[str] = None,
         expired_before: Optional[str] = None,
     ) -> List[str]:
-        params = {
-            "expired_after": expired_after,
-            "expired_before": expired_before,
-        }
-        params = remove_nones(params)
-        return await self._request(Methods.DELETE, "/users/expired", params=params)
+        params = ExpiredBeforeAfterParams(
+            expired_after=expired_after,
+            expired_before=expired_before,
+        )
+        return await self._request(Methods.DELETE, "/users/expired", params=params.model_dump(exclude_none=True))
 
 # EXTRA (not default methods)
 
@@ -687,7 +706,7 @@ class MarzbanAPI:
 
         :return: `UsersResponse`
         """
-        all_users = await self.get_users(status=UserStatus.active.value) # TODO: Fix to avoid .value
+        all_users = await self.get_users(status=UserStatus.active)
         online_users = []
 
         for user in all_users.users:

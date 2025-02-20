@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import requests
 import time
 import requests
 
@@ -13,11 +14,13 @@ from aiomarzban.utils import future_unix_time
 load_dotenv()
 
 url = os.getenv("MARZBAN_ADDRESS")
+username = os.getenv("MARZBAN_USERNAME")
+password = os.getenv("MARZBAN_PASSWORD")
 
 client = MarzbanAPI(
     address=url,
-    username=os.getenv("MARZBAN_USERNAME"),
-    password=os.getenv("MARZBAN_PASSWORD"),
+    username=username,
+    password=password,
     default_days=10,
     default_proxies = {
         "vless": {
@@ -27,7 +30,47 @@ client = MarzbanAPI(
     default_data_limit=10,
 )
 
+import requests
 
+
+data = {
+    "username": username,
+    "password": password,
+}
+
+
+ans = requests.post(url + "/api/admin/token", data=data)
+token = ans.json().get("access_token")
+
+
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {token}",
+}
+
+# payload = {
+#     "username": "some_user",
+#     "status": UserStatusModify.disabled,
+# }
+#
+# disabled_user = requests.put(url + "/api/user/some_user", json=payload, headers=headers)
+# print(disabled_user.json().get("status"))
+#
+# # Reset all users
+# # requests.post(url + "/api/users/reset", headers=headers)
+# requests.post(url + "/api/admin/usage/reset/marzban", headers=headers)
+
+
+
+
+user = requests.get(url + "/api/user/some_user", headers=headers)
+print(user.json().get("admin"))
+
+# payload = {"admin_username": "some_admin"}
+
+updated_user = requests.put(url + "/api/user/some_user/set-owner?admin_username=some_admin", headers=headers)
+print(updated_user.json())
 
 
 async def main():
@@ -58,10 +101,23 @@ async def main():
     #     proxies={"vless": {"flow": ""}},
     # )
     # print(data)
-    templates = await client.get_user_templates()
-    for template in templates:
-        await client.remove_user_template(template.id)
-        print(f"User {template.username} deleted successfully.")
+    # templates = await client.get_user_templates()
+    # for template in templates:
+    #     await client.remove_user_template(template.id)
+    #     print(f"User {template.username} deleted successfully.")
+
+    # users = await client.get_users(status=UserStatus.active.value)
+    # user = await client.add_user(
+    #     username="some_user",
+    # )
+    # user = await client.create_admin(
+    #     username="some_admin",
+    #     password="123",
+    # )
+    # print(user)
+
+    ...
+
 
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ This library is fully compatible with **[Marzban](https://github.com/Gozargah/Ma
 ## Installation
 
 ```bash
-pip install aiomarzban
+pip install aiomarzban --upgrade
 ```
 
 ## Examples

@@ -19,7 +19,6 @@ setup(
     url='https://github.com/P1nk-L0rD/aiomarzban',
     packages=find_packages(),
     install_requires=[
-        'requests>=2.5.0',
         'aiohttp>=3.7.3',
         'pydantic>=2.0',
         'datetime>=4.0',

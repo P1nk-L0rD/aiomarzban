@@ -86,7 +86,7 @@ async def test_get_users(get_api_client):
 async def test_get_users_with_params(get_api_client):
     api_client = get_api_client
     users = await api_client.get_users(
-        status=UserStatus.disabled.value,
+        status=UserStatus.disabled,
     )
     assert user_username in [user.username for user in users.users]
 
@@ -111,21 +111,21 @@ async def test_reset_users_data_usage(get_api_client):
 #     usages = await api_client.get_users_usage()
 
 
-# async def test_set_owner(get_api_client): # TODO: not working in marzban
-#     api_client = get_api_client
-#
-#     user = await api_client.get_user(username=user_username)
-#     current_admin = await api_client.get_current_admin()
-#     assert user.admin.username == current_admin.username
-#
-#     time.sleep(0.5)
-#     new_admin = await api_client.create_admin(username="second", password="<PASSWORD>")
-#     user = await api_client.set_owner(username=user_username, admin_username=new_admin.username)
-#     assert user.admin.username == new_admin.username
-#
-#     time.sleep(0.5)
-#     await api_client.set_owner(username=user_username, admin_username=current_admin.username)
-#     await api_client.remove_admin(new_admin.username)
+async def test_set_owner(get_api_client):
+    api_client = get_api_client
+
+    user = await api_client.get_user(username=user_username)
+    current_admin = await api_client.get_current_admin()
+    assert user.admin.username == current_admin.username
+
+    time.sleep(0.5)
+    new_admin = await api_client.create_admin(username="second", password="<PASSWORD>")
+    user = await api_client.set_owner(username=user_username, admin_username=new_admin.username)
+    assert user.admin.username == new_admin.username
+
+    time.sleep(0.5)
+    await api_client.set_owner(username=user_username, admin_username=current_admin.username)
+    await api_client.remove_admin(new_admin.username)
 
 
 expired_user_username = "Expired_user"
