@@ -186,7 +186,7 @@ async def main():
     users_usage = await marzban.get_users_usage()
     print("Users usage: ", users_usage)
 
-    # Set owner (Not working in Marzban API 0.8.4)
+    # Set owner
     modified_user = await marzban.set_owner(user.username, admin_username=current_admin.username)
     print("Modified user: ", modified_user)
 

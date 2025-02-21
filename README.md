@@ -1,8 +1,9 @@
 # aiomarzban
 
+[![Stars](https://img.shields.io/github/stars/P1nk-L0rD/aiomarzban.svg?style=social)](https://github.com/P1nk-L0rD/aiomarzban/stargazers)
 [![Downloads](https://img.shields.io/pypi/dm/aiomarzban.svg)](https://pypi.python.org/pypi/aiomarzban)
 
-Async SDK for the Marzban API based on aiohttp, requests, and pydantic.
+Async SDK for the Marzban API based on aiohttp and pydantic.
 This library is fully compatible with **[Marzban](https://github.com/Gozargah/Marzban) version 0.8.4** and supports all panel methods.
 
 ## Features
