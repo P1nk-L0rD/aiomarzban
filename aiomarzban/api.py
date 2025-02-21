@@ -590,7 +590,6 @@ class MarzbanAPI:
             sort=sort,
         )
         data = params.model_dump(exclude_none=True)
-        print(type(data), type(data.get("status")))
         resp = await self._request(Methods.GET, "/users", params=params.model_dump(exclude_none=True), timeout=timeout)
         return UsersResponse(**resp)
 
@@ -657,8 +656,7 @@ class MarzbanAPI:
     async def user_get_or_create(self, username: Any, **kwargs: Any) -> UserResponse:
         try:
             return await self.get_user(username)
-        except Exception as e:
-            print(e)
+        except Exception:
             return await self.add_user(username, **kwargs)
 
     async def user_add_days(self, username: Any, days: int) -> UserResponse:
