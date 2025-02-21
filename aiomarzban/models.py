@@ -26,7 +26,23 @@ class AdminModify(BaseModel):
     telegram_id: Optional[int] = None
     discord_webhook: Optional[str] = None
 
+
+class AdminTokenPost(BaseModel):
+    grant_type: Optional[str] = None
+    username: str
+    password: str
+    scope: Optional[str] = ""
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+
+
+class AdminTokenAnswer(BaseModel):
+    access_token: str
+    token_type: Optional[str] = "bearer"
+
+
 # CORE
+
 
 class CoreStats(BaseModel):
     version: str
@@ -49,7 +65,8 @@ class NextPlanModel(BaseModel):
     expire: Optional[int] = None
     add_remaining_traffic: Optional[bool] = False
 
-# NODES
+
+# NODE
 
 
 class NodeBase(BaseModel):
@@ -236,6 +253,9 @@ class UserResponse(BaseModel):
     admin: Optional[Admin] = None
 
 
+# USER TEMPLATE
+
+
 class UserTemplateCreate(BaseModel):
     name: Optional[str] = None
     data_limit: Optional[int] = None
@@ -251,6 +271,9 @@ class UserTemplateModify(UserTemplateCreate):
 
 class UserTemplateResponse(UserTemplateCreate):
     id: int
+
+
+# USAGE
 
 
 class UserUsageResponse(BaseModel):
@@ -279,5 +302,42 @@ class ValidationError(BaseModel):
     type: str
 
 
+# CUSTOM
+
+
 class SetOwner(BaseModel):
     admin_username: str
+
+
+# PARAMS MODELS
+
+
+class OffsetLimitUsernameParams(BaseModel):
+    offset: Optional[int] = None
+    limit: Optional[int] = None
+    username: Optional[str] = None
+
+
+class StartEndParams(BaseModel):
+    start: Optional[Any] = ""
+    end: Optional[Any] = ""
+
+
+class StartEndAdminParams(StartEndParams):
+    admin: Optional[str] = None
+
+
+class GetUsersParams(BaseModel):
+    offset: Optional[int] = None
+    limit: Optional[int] = None
+    username: Optional[List[str]] = None
+    search: Optional[str] = None
+    admin: Optional[str] = None
+    status: Optional[UserStatus] = None
+    sort: Optional[str] = None
+
+
+class ExpiredBeforeAfterParams(BaseModel):
+    expired_before: Optional[str] = None
+    expired_after: Optional[str] = None
+
