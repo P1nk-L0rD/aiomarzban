@@ -664,6 +664,7 @@ class MarzbanAPI:
         return await self._request(Methods.DELETE, "/users/expired", params=params.model_dump(exclude_none=True))
 
 # SESSION
+
     async def close(self) -> None:
         if self.session:
             await self.session.close()
