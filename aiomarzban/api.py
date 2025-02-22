@@ -2,7 +2,7 @@ import copy
 import datetime
 from asyncio.exceptions import TimeoutError
 from http import HTTPStatus
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Union
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -48,6 +48,7 @@ class MarzbanAPI:
         # Request settings
         timeout: Optional[int] = 10,
         retries: Optional[int] = 1,
+        use_single_session: Optional[bool] = False,
     ):
         """
         Provide password, username and password to create api client.
@@ -73,6 +74,7 @@ class MarzbanAPI:
         :param client_secret: Client Secret.
         :param timeout: Default timeout in seconds.
         :param retries: Default number of retries (after first unsuccessful request).
+        :param use_single_session: If true, don't forget to close the session before stopping program with .close().
         """
         self.address = address
         self.api_url = address + "api"
@@ -80,7 +82,6 @@ class MarzbanAPI:
         self.password = str(password)
         self.sub_path = sub_path
         self.headers = None
-        self.encoded_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
         # Default user params
         self.default_days = default_days
@@ -108,6 +109,8 @@ class MarzbanAPI:
         # Request settings
         self.timeout = timeout
         self.retries = retries
+        self.use_single_session = use_single_session
+        self.session = None
 
     async def _async_request(
         self,
@@ -120,13 +123,18 @@ class MarzbanAPI:
         api_url: Optional[str] = None,
         timeout: Optional[int] = None,
         allow_empty_headers: Optional[bool] = False,
-    ):
+    ) -> Union[dict, int, list, None]:
         """Async requests to server via HTTP."""
 
         if headers is None and self.headers is None and not allow_empty_headers:
             await self.refresh_credentials()
 
-        async with aiohttp.ClientSession() as session:
+        if self.use_single_session and self.session:
+            session = self.session
+        else:
+            session = aiohttp.ClientSession()
+
+        try:
             async with session.request(
                 method,
                 url=(api_url or self.api_url) + path,
@@ -152,6 +160,10 @@ class MarzbanAPI:
 
                 else:
                     raise Exception(f"Error: {resp.status}; Body: {await resp.text()}; Data: {data}")
+
+        finally:
+            if not self.use_single_session:
+                await session.close()
 
     async def _request(
         self,
@@ -650,6 +662,11 @@ class MarzbanAPI:
             expired_before=expired_before,
         )
         return await self._request(Methods.DELETE, "/users/expired", params=params.model_dump(exclude_none=True))
+
+# SESSION
+    async def close(self) -> None:
+        if self.session:
+            await self.session.close()
 
 # EXTRA (not default methods)
 

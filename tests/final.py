@@ -21,3 +21,7 @@ async def delete_all_data(api_client: MarzbanAPI):
     for template in templates:
         await api_client.remove_user_template(template.id)
         print(f"User {template.username} deleted successfully.")
+
+
+async def close_session(api_client: MarzbanAPI):
+    await api_client.close()

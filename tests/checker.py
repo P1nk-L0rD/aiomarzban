@@ -26,6 +26,16 @@ client = MarzbanAPI(
 
 
 async def main():
+    async def test():
+        try:
+            print("Начало try")
+            return "Возвращаем значение"
+        finally:
+            print("Выполняем finally")
+
+    result = await test()
+    print(result)
+
     ...
 
 
