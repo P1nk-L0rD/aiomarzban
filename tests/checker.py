@@ -23,7 +23,7 @@ client = MarzbanAPI(
         }
     },
     default_data_limit=10,
-    use_single_session=True,
+    # use_single_session=True,
 )
 
 
@@ -34,10 +34,7 @@ async def not_main():
 
 
 async def main():
-    print("Second def")
-    users = await client.get_users()
-    print(users.total)
-    await asyncio.sleep(1)
+    user = await client.get_or_create_user('2222')
 
     await client.close()
 
@@ -46,5 +43,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(not_main())
     asyncio.run(main())

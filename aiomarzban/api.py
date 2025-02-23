@@ -10,7 +10,7 @@ import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
 
 from .enums import UserDataLimitResetStrategy, Methods
-from .exceptions import MarzbanException
+from .exceptions import MarzbanException, MarzbanNotFoundException
 from .models import Admin, AdminCreate, AdminModify, CoreStats, NodeCreate, NodeModify, NodeResponse, NodeSettings, \
     NodeStatus, NodesUsageResponse, SubscriptionUserResponse, SystemStats, ProxyInbound, ProxyHost, \
     UserTemplateResponse, UserTemplateCreate, UserTemplateModify, NextPlanModel, UserStatusCreate, UserCreate, \
@@ -161,6 +161,9 @@ class MarzbanAPI:
                     elif error == "Incorrect username or password":
                         raise MarzbanException(error)
                     raise MarzbanException(f"Auth error: {error}")
+
+                elif resp.status == HTTPStatus.NOT_FOUND:
+                    raise MarzbanNotFoundException(await resp.text())
 
                 else:
                     raise Exception(f"Error: {resp.status}; Body: {await resp.text()}; Data: {data}")
@@ -675,11 +678,51 @@ class MarzbanAPI:
 
 # EXTRA (not default methods)
 
-    async def user_get_or_create(self, username: Any, **kwargs: Any) -> UserResponse:
+    async def get_or_create_user(
+        self,
+        username: Any,
+        proxies: Optional[Dict[str, Any]] = None,
+        expire: Optional[int] = None,
+        days: Optional[int] = None,
+        data_limit: Optional[int] = None,
+        data_limit_reset_strategy: Optional[UserDataLimitResetStrategy] = UserDataLimitResetStrategy.no_reset,
+        inbounds: Optional[Dict[str, Any]] = None,
+        note: Optional[str] = None,
+        sub_updated_at: Optional[str] = None,
+        sub_last_user_agent: Optional[str] = None,
+        online_at: Optional[str] = None,
+        on_hold_expire_duration: Optional[int] = None,
+        on_hold_timeout: Optional[str] = None,
+        auto_delete_in_days: Optional[int] = None,
+        next_plan: Optional[NextPlanModel] = None,
+        status: Optional[UserStatusCreate] = UserStatusCreate.active,
+    ) -> UserResponse:
+        """
+        Gets user if exists or creates a new one with provided parameters.
+
+        :return: `UserResponse`
+        """
         try:
             return await self.get_user(username)
-        except Exception:
-            return await self.add_user(username, **kwargs)
+        except MarzbanNotFoundException:
+            return await self.add_user(
+                username,
+                proxies=proxies,
+                expire=expire,
+                days=days,
+                data_limit=data_limit,
+                data_limit_reset_strategy=data_limit_reset_strategy,
+                inbounds=inbounds,
+                note=note,
+                sub_updated_at=sub_updated_at,
+                sub_last_user_agent=sub_last_user_agent,
+                online_at=online_at,
+                on_hold_expire_duration=on_hold_expire_duration,
+                on_hold_timeout=on_hold_timeout,
+                auto_delete_in_days=auto_delete_in_days,
+                next_plan=next_plan,
+                status=status,
+            )
 
     async def user_add_days(self, username: Any, days: int) -> UserResponse:
         """
