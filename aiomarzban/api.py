@@ -1,5 +1,7 @@
+import asyncio
 import copy
 import datetime
+import os
 from asyncio.exceptions import TimeoutError
 from http import HTTPStatus
 from typing import Optional, List, Any, Dict, Union
@@ -129,13 +131,15 @@ class MarzbanAPI:
         if headers is None and self.headers is None and not allow_empty_headers:
             await self.refresh_credentials()
 
-        if self.use_single_session and self.session:
-            session = self.session
+        if self.use_single_session and self.session and not self.session.closed:
+            ...
         else:
-            session = aiohttp.ClientSession()
+            self.session = aiohttp.ClientSession()
+            if self.use_single_session and os.name == "nt":
+                asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
         try:
-            async with session.request(
+            async with self.session.request(
                 method,
                 url=(api_url or self.api_url) + path,
                 json=data,
@@ -163,7 +167,7 @@ class MarzbanAPI:
 
         finally:
             if not self.use_single_session:
-                await session.close()
+                await self.session.close()
 
     async def _request(
         self,
@@ -666,7 +670,7 @@ class MarzbanAPI:
 # SESSION
 
     async def close(self) -> None:
-        if self.session:
+        if self.session and not self.session.closed:
             await self.session.close()
 
 # EXTRA (not default methods)

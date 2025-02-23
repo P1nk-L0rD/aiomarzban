@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -22,22 +23,28 @@ client = MarzbanAPI(
         }
     },
     default_data_limit=10,
+    use_single_session=True,
 )
 
 
+async def not_main():
+    users = await client.get_users()
+    print(users.total)
+    await asyncio.sleep(1)
+
+
 async def main():
-    async def test():
-        try:
-            print("Начало try")
-            return "Возвращаем значение"
-        finally:
-            print("Выполняем finally")
+    print("Second def")
+    users = await client.get_users()
+    print(users.total)
+    await asyncio.sleep(1)
 
-    result = await test()
-    print(result)
+    await client.close()
 
+    # await client.close()
     ...
 
 
 if __name__ == "__main__":
+    asyncio.run(not_main())
     asyncio.run(main())
