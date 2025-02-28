@@ -26,10 +26,8 @@ def get_api_client():
         address=os.getenv("MARZBAN_ADDRESS"),
         username=os.getenv("MARZBAN_USERNAME"),
         password=os.getenv("MARZBAN_PASSWORD"),
-        use_single_session=True,
     )
 
     yield client
     if not os.getenv("PROD") == "FALSE":
         asyncio.run(delete_all_data(client))
-    asyncio.run(close_session(client))
