@@ -6,7 +6,7 @@ import pytest
 from dotenv import load_dotenv
 
 from aiomarzban import MarzbanAPI
-from tests.final import delete_all_data
+from tests.final import delete_all_data, close_session
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -18,11 +18,9 @@ def wait_after_test():
     time.sleep(1)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def get_api_client():
     load_dotenv()
-
-    PROD =  os.getenv("PROD") == "FALSE"
 
     client = MarzbanAPI(
         address=os.getenv("MARZBAN_ADDRESS"),
@@ -31,5 +29,5 @@ def get_api_client():
     )
 
     yield client
-    if not PROD:
+    if not os.getenv("PROD") == "FALSE":
         asyncio.run(delete_all_data(client))

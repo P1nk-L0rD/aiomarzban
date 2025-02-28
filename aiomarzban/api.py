@@ -1,14 +1,16 @@
+import asyncio
 import copy
 import datetime
+import os
 from asyncio.exceptions import TimeoutError
 from http import HTTPStatus
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Union
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
 
 from .enums import UserDataLimitResetStrategy, Methods
-from .exceptions import MarzbanException
+from .exceptions import MarzbanException, MarzbanNotFoundException
 from .models import Admin, AdminCreate, AdminModify, CoreStats, NodeCreate, NodeModify, NodeResponse, NodeSettings, \
     NodeStatus, NodesUsageResponse, SubscriptionUserResponse, SystemStats, ProxyInbound, ProxyHost, \
     UserTemplateResponse, UserTemplateCreate, UserTemplateModify, NextPlanModel, UserStatusCreate, UserCreate, \
@@ -48,6 +50,7 @@ class MarzbanAPI:
         # Request settings
         timeout: Optional[int] = 10,
         retries: Optional[int] = 1,
+        use_single_session: Optional[bool] = False,
     ):
         """
         Provide password, username and password to create api client.
@@ -73,6 +76,7 @@ class MarzbanAPI:
         :param client_secret: Client Secret.
         :param timeout: Default timeout in seconds.
         :param retries: Default number of retries (after first unsuccessful request).
+        :param use_single_session: If true, don't forget to close the session before stopping program with .close().
         """
         self.address = address
         self.api_url = address + "api"
@@ -80,7 +84,6 @@ class MarzbanAPI:
         self.password = str(password)
         self.sub_path = sub_path
         self.headers = None
-        self.encoded_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
         # Default user params
         self.default_days = default_days
@@ -108,6 +111,8 @@ class MarzbanAPI:
         # Request settings
         self.timeout = timeout
         self.retries = retries
+        self.use_single_session = use_single_session
+        self.session = None
 
     async def _async_request(
         self,
@@ -120,14 +125,21 @@ class MarzbanAPI:
         api_url: Optional[str] = None,
         timeout: Optional[int] = None,
         allow_empty_headers: Optional[bool] = False,
-    ):
+    ) -> Union[dict, int, list, None]:
         """Async requests to server via HTTP."""
 
         if headers is None and self.headers is None and not allow_empty_headers:
             await self.refresh_credentials()
 
-        async with aiohttp.ClientSession() as session:
-            async with session.request(
+        if self.use_single_session and self.session and not self.session.closed:
+            ...
+        else:
+            self.session = aiohttp.ClientSession()
+            if self.use_single_session and os.name == "nt":
+                asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+        try:
+            async with self.session.request(
                 method,
                 url=(api_url or self.api_url) + path,
                 json=data,
@@ -150,8 +162,15 @@ class MarzbanAPI:
                         raise MarzbanException(error)
                     raise MarzbanException(f"Auth error: {error}")
 
+                elif resp.status == HTTPStatus.NOT_FOUND:
+                    raise MarzbanNotFoundException(await resp.text())
+
                 else:
                     raise Exception(f"Error: {resp.status}; Body: {await resp.text()}; Data: {data}")
+
+        finally:
+            if not self.use_single_session:
+                await self.session.close()
 
     async def _request(
         self,
@@ -590,7 +609,6 @@ class MarzbanAPI:
             sort=sort,
         )
         data = params.model_dump(exclude_none=True)
-        print(type(data), type(data.get("status")))
         resp = await self._request(Methods.GET, "/users", params=params.model_dump(exclude_none=True), timeout=timeout)
         return UsersResponse(**resp)
 
@@ -652,14 +670,59 @@ class MarzbanAPI:
         )
         return await self._request(Methods.DELETE, "/users/expired", params=params.model_dump(exclude_none=True))
 
+# SESSION
+
+    async def close(self) -> None:
+        if self.session and not self.session.closed:
+            await self.session.close()
+
 # EXTRA (not default methods)
 
-    async def user_get_or_create(self, username: Any, **kwargs: Any) -> UserResponse:
+    async def get_or_create_user(
+        self,
+        username: Any,
+        proxies: Optional[Dict[str, Any]] = None,
+        expire: Optional[int] = None,
+        days: Optional[int] = None,
+        data_limit: Optional[int] = None,
+        data_limit_reset_strategy: Optional[UserDataLimitResetStrategy] = UserDataLimitResetStrategy.no_reset,
+        inbounds: Optional[Dict[str, Any]] = None,
+        note: Optional[str] = None,
+        sub_updated_at: Optional[str] = None,
+        sub_last_user_agent: Optional[str] = None,
+        online_at: Optional[str] = None,
+        on_hold_expire_duration: Optional[int] = None,
+        on_hold_timeout: Optional[str] = None,
+        auto_delete_in_days: Optional[int] = None,
+        next_plan: Optional[NextPlanModel] = None,
+        status: Optional[UserStatusCreate] = UserStatusCreate.active,
+    ) -> UserResponse:
+        """
+        Gets user if exists or creates a new one with provided parameters.
+
+        :return: `UserResponse`
+        """
         try:
             return await self.get_user(username)
-        except Exception as e:
-            print(e)
-            return await self.add_user(username, **kwargs)
+        except MarzbanNotFoundException:
+            return await self.add_user(
+                username,
+                proxies=proxies,
+                expire=expire,
+                days=days,
+                data_limit=data_limit,
+                data_limit_reset_strategy=data_limit_reset_strategy,
+                inbounds=inbounds,
+                note=note,
+                sub_updated_at=sub_updated_at,
+                sub_last_user_agent=sub_last_user_agent,
+                online_at=online_at,
+                on_hold_expire_duration=on_hold_expire_duration,
+                on_hold_timeout=on_hold_timeout,
+                auto_delete_in_days=auto_delete_in_days,
+                next_plan=next_plan,
+                status=status,
+            )
 
     async def user_add_days(self, username: Any, days: int) -> UserResponse:
         """

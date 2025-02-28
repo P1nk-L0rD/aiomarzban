@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -22,10 +23,22 @@ client = MarzbanAPI(
         }
     },
     default_data_limit=10,
+    # use_single_session=True,
 )
 
 
+async def not_main():
+    users = await client.get_users()
+    print(users.total)
+    await asyncio.sleep(1)
+
+
 async def main():
+    user = await client.get_or_create_user('2222')
+
+    await client.close()
+
+    # await client.close()
     ...
 
 
