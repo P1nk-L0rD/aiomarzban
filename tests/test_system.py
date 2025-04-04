@@ -5,7 +5,7 @@ import time
 
 from tests.conftest import get_api_client
 
-hosts = None
+original_hosts = None
 
 file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "hosts.json"))
 with open(file_path) as f:
@@ -24,23 +24,22 @@ async def test_get_inbounds(get_api_client):
 
 async def test_get_hosts(get_api_client):
     api_client = get_api_client
-    global hosts
-    hosts = await api_client.get_hosts()
+    global original_hosts
+    original_hosts = await api_client.get_hosts()
 
 
 async def test_modify_hosts(get_api_client):
     api_client = get_api_client
 
-    first_hosts = copy.deepcopy(new_hosts)
-    first_hosts["VLESS host"][0]["remark"] = "First test host"
-    current_hosts = await api_client.modify_hosts(first_hosts)
-    assert current_hosts != new_hosts, "Hosts were not modified."
+    # Creating new modified hosts
+    modified_hosts = copy.deepcopy(new_hosts)
+    modified_hosts["VLESS host"][0]["remark"] = "Test host modification"
+
+    # Applying modified hosts and checking if it is working
+    updated_hosts = await api_client.modify_hosts(modified_hosts)
+    assert updated_hosts != new_hosts, "Hosts were not modified."
 
     # Settings second config and comparing
     time.sleep(0.5)
-    current_hosts = await api_client.modify_hosts(new_hosts)
-    assert current_hosts == new_hosts, "Hosts were not modified."
-
-    # Setting old hosts
-    time.sleep(0.5)
-    await api_client.modify_hosts(hosts)
+    restored_hosts = await api_client.modify_hosts(original_hosts)
+    assert restored_hosts == original_hosts, "Hosts were not restored to original."
