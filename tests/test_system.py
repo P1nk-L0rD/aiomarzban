@@ -39,7 +39,7 @@ async def test_modify_hosts(get_api_client):
     updated_hosts = await api_client.modify_hosts(modified_hosts)
     assert updated_hosts != new_hosts, "Hosts were not modified."
 
-    # Settings second config and comparing
+    # Settings original hosts
     time.sleep(0.5)
     restored_hosts = await api_client.modify_hosts(original_hosts)
     assert restored_hosts == original_hosts, "Hosts were not restored to original."
