@@ -1,7 +1,5 @@
-import asyncio
 import copy
 import datetime
-import os
 from asyncio.exceptions import TimeoutError
 from http import HTTPStatus
 from typing import Optional, List, Any, Dict, Union
@@ -111,8 +109,6 @@ class MarzbanAPI:
         # Request settings
         self.timeout = timeout
         self.retries = retries
-        self.use_single_session = use_single_session
-        self.session = None
 
     async def _async_request(
         self,
@@ -131,15 +127,8 @@ class MarzbanAPI:
         if headers is None and self.headers is None and not allow_empty_headers:
             await self.refresh_credentials()
 
-        if self.use_single_session and self.session and not self.session.closed:
-            ...
-        else:
-            self.session = aiohttp.ClientSession()
-            if self.use_single_session and os.name == "nt":
-                asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-        try:
-            async with self.session.request(
+        async with aiohttp.ClientSession() as session:
+            async with session.request(
                 method,
                 url=(api_url or self.api_url) + path,
                 json=data,
@@ -168,10 +157,6 @@ class MarzbanAPI:
                 else:
                     raise Exception(f"Error: {resp.status}; Body: {await resp.text()}; Data: {data}")
 
-        finally:
-            if not self.use_single_session:
-                await self.session.close()
-
     async def _request(
         self,
         method: str,
@@ -199,11 +184,11 @@ class MarzbanAPI:
                     timeout=timeout,
                     allow_empty_headers=allow_empty_headers,
                 )
-            except (ClientConnectorError, TimeoutError):
+            except (ClientConnectorError, TimeoutError) as e:
                 if attempt < self.retries:
                     continue
                 else:
-                    raise
+                    raise e
 
 # ADMIN
 
@@ -673,8 +658,7 @@ class MarzbanAPI:
 # SESSION
 
     async def close(self) -> None:
-        if self.session and not self.session.closed:
-            await self.session.close()
+        return
 
 # EXTRA (not default methods)
 
