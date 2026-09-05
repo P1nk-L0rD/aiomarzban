@@ -493,11 +493,11 @@ class MarzbanAPI:
         :return: `UserResponse`
         """
 
-        if days:
+        if days is not None:
             expire = future_unix_time(days=days)
-        elif expire:
+        elif expire is not None:
             ...
-        elif self.default_days:
+        elif self.default_days is not None:
             expire = future_unix_time(days=self.default_days)
 
         data = UserCreate(
